@@ -26,6 +26,15 @@ describe("buildOllamaPayload", () => {
       buildOllamaPayload({ model: "llama3.2", messages: [] }),
     ).toThrow("At least one message is required.");
   });
+
+  it("rejects invalid chat payloads before forwarding", () => {
+    expect(() =>
+      buildOllamaPayload({
+        model: "llama3.2",
+        messages: [{ role: "user", content: "   " }],
+      }),
+    ).toThrow("At least one message is required.");
+  });
 });
 
 describe("requestOllamaChat", () => {
@@ -61,5 +70,18 @@ describe("requestOllamaChat", () => {
         }),
       }),
     );
+  });
+
+  it("reports unreachable Ollama responses", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("model not found", { status: 404 }),
+    );
+
+    await expect(
+      requestOllamaChat({
+        model: "llama3.2",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    ).rejects.toThrow("model not found");
   });
 });
