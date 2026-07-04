@@ -49,6 +49,7 @@ export function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const canSend = useMemo(
     () => draft.trim().length > 0 && !isSending,
@@ -58,6 +59,14 @@ export function Chat() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "end",
+    });
+    inputRef.current?.focus();
+  }, [messages, isSending]);
 
   async function sendMessage() {
     const content = draft.trim();
@@ -158,6 +167,7 @@ export function Chat() {
               Ollama is thinking...
             </div>
           ) : null}
+          <div ref={messagesEndRef} aria-hidden="true" />
         </div>
 
         <form
