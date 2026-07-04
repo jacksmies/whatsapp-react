@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type ChatRole = "user" | "assistant";
 
@@ -47,6 +54,10 @@ export function Chat() {
     () => draft.trim().length > 0 && !isSending,
     [draft, isSending],
   );
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   async function sendMessage() {
     const content = draft.trim();
