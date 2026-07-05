@@ -13,6 +13,7 @@ describe("buildOllamaPayload", () => {
       }),
     ).toEqual({
       model: "llama3.2",
+      keep_alive: -1,
       stream: false,
       messages: [
         { role: "user", content: "hello" },
@@ -65,6 +66,7 @@ describe("requestOllamaChat", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama3.2",
+          keep_alive: -1,
           stream: false,
           messages: [{ role: "user", content: "hello" }],
         }),

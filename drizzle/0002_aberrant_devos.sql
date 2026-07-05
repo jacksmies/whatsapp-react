@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "conversations_channel_external_contact_id_idx" ON "conversations" USING btree ("channel","external_contact_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "messages_external_message_id_idx" ON "messages" USING btree ("external_message_id");

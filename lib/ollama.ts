@@ -40,6 +40,7 @@ export function buildOllamaPayload({ model, messages }: BuildPayloadInput) {
 
   return {
     model,
+    keep_alive: -1,
     stream: false,
     messages: normalizedMessages,
   };

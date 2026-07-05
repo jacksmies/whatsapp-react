@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ALTER COLUMN "ai_auto_reply_enabled" SET DEFAULT true;

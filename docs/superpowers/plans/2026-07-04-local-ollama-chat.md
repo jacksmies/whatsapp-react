@@ -25,6 +25,7 @@
 ### Task 1: Add Test Harness And Ollama Helper
 
 **Files:**
+
 - Modify: `package.json`
 - Create: `lib/ollama.test.ts`
 - Create: `lib/ollama.ts`
@@ -229,6 +230,7 @@ git commit -m "test: add ollama chat helper"
 ### Task 2: Add The Chat API Route
 
 **Files:**
+
 - Create: `app/api/chat/route.ts`
 - Modify: `lib/ollama.test.ts`
 
@@ -335,6 +337,7 @@ git commit -m "feat: add ollama chat api route"
 ### Task 3: Build The Chat UI
 
 **Files:**
+
 - Create: `app/components/chat.tsx`
 - Modify: `app/page.tsx`
 - Modify: `app/layout.tsx`
@@ -370,7 +373,7 @@ const initialMessages: ChatMessage[] = [
   {
     id: "welcome",
     role: "assistant",
-    content: "Hi. Ask me anything and I will send it to your local Ollama model.",
+    content: "Hi. Ask me anything about Klaster.",
   },
 ];
 
@@ -414,7 +417,10 @@ export function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: nextMessages.map(({ role, content }) => ({ role, content })),
+          messages: nextMessages.map(({ role, content }) => ({
+            role,
+            content,
+          })),
         }),
       });
 
@@ -458,7 +464,9 @@ export function Chat() {
         <header className="flex items-center justify-between border-b border-zinc-200 pb-4">
           <div>
             <h1 className="text-xl font-semibold">Local Ollama Chat</h1>
-            <p className="text-sm text-zinc-600">Next.js connected to your local model</p>
+            <p className="text-sm text-zinc-600">
+              Next.js connected to your local model
+            </p>
           </div>
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
             llama3.2
@@ -475,13 +483,15 @@ export function Chat() {
                   : "mr-auto max-w-[82%] rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 shadow-sm"
               }
             >
-              <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+              <p className="whitespace-pre-wrap text-sm leading-6">
+                {message.content}
+              </p>
             </article>
           ))}
 
           {isSending ? (
             <div className="mr-auto rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-500 shadow-sm">
-              Ollama is thinking...
+              Bot is thinking...
             </div>
           ) : null}
         </div>
@@ -608,13 +618,14 @@ git commit -m "feat: build local ollama chat ui"
 ### Task 4: Document Local Usage
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Update README commands**
 
 Replace `README.md` with:
 
-```md
+````md
 # Local Ollama Chat
 
 A small Next.js app that sends chat messages to a locally running Ollama model.
@@ -631,6 +642,7 @@ Start the Ollama server:
 ```bash
 ollama serve
 ```
+````
 
 In another terminal, pull the default model:
 
@@ -671,7 +683,8 @@ npm test
 npm run lint
 npm run build
 ```
-```
+
+````
 
 - [ ] **Step 2: Verify docs and final status**
 
@@ -682,7 +695,7 @@ npm test
 npm run lint
 npm run build
 git status --short
-```
+````
 
 Expected: tests, lint, and build PASS; git status shows only intended README changes before commit.
 
