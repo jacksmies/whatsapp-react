@@ -66,6 +66,31 @@ OpenAI Responses-style payload. `MODEL_REASONING_EFFORT` is optional; when set,
 reasoning summaries returned by the provider are logged to the terminal but kept
 out of customer-facing replies.
 
+Gemini's OpenAI-compatible Chat Completions endpoint can be configured like
+this:
+
+```env
+MODEL_NAME=gemini-flash-latest
+MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+MODEL_API_KEY=your-google-api-key
+```
+
+When `MODEL_BASE_URL` ends in `/openai` or `/chat/completions`, the app posts
+to `/chat/completions` with an OpenAI Chat Completions-style payload.
+
+You can also configure a fallback model for rate limits. If the primary provider
+returns HTTP 429, the app retries the same request with the fallback provider and
+logs the primary provider's `retry-after` value when present:
+
+```env
+MODEL_NAME=openai/gpt-oss-20b
+MODEL_BASE_URL=https://api.groq.com/openai/v1
+MODEL_API_KEY=gsk-your-key
+MODEL_FALLBACK_NAME=gemini-flash-latest
+MODEL_FALLBACK_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+MODEL_FALLBACK_API_KEY=your-google-api-key
+```
+
 You can also set these in `.env`:
 
 ```env
@@ -73,6 +98,10 @@ MODEL_NAME=llama3.2
 MODEL_BASE_URL=http://localhost:11434/api/chat
 MODEL_API_KEY=
 MODEL_REASONING_EFFORT=
+MODEL_FALLBACK_NAME=
+MODEL_FALLBACK_BASE_URL=
+MODEL_FALLBACK_API_KEY=
+MODEL_FALLBACK_REASONING_EFFORT=
 ```
 
 The older `OLLAMA_MODEL` and `OLLAMA_BASE_URL` variables are still supported.

@@ -369,6 +369,168 @@ describe("requestOllamaChat", () => {
       ],
     });
   });
+
+  it("posts OpenAI Chat Completions payloads to Gemini-compatible endpoints", async () => {
+    vi.stubEnv(
+      "MODEL_BASE_URL",
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+    );
+    vi.stubEnv("MODEL_API_KEY", "gemini-key");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "Gemini says hello.",
+              },
+            },
+          ],
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 4,
+            total_tokens: 14,
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "gemini-flash-latest",
+        messages: [{ role: "user", content: "Hello" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "list_course_availability",
+              description: "List available course dates.",
+              parameters: {
+                type: "object",
+                required: ["courseTitle"],
+                properties: {
+                  courseTitle: { type: "string" },
+                },
+              },
+            },
+            execute: vi.fn(),
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "Gemini says hello.",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer gemini-key",
+        },
+        body: JSON.stringify({
+          model: "gemini-flash-latest",
+          messages: [{ role: "user", content: "Hello" }],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "list_course_availability",
+                description: "List available course dates.",
+                parameters: {
+                  type: "object",
+                  required: ["courseTitle"],
+                  properties: {
+                    courseTitle: { type: "string" },
+                  },
+                },
+              },
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("falls back to a secondary provider when the primary returns 429", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://api.groq.com/openai/v1");
+    vi.stubEnv("MODEL_API_KEY", "groq-key");
+    vi.stubEnv("MODEL_FALLBACK_NAME", "gemini-flash-latest");
+    vi.stubEnv(
+      "MODEL_FALLBACK_BASE_URL",
+      "https://generativelanguage.googleapis.com/v1beta/openai",
+    );
+    vi.stubEnv("MODEL_FALLBACK_API_KEY", "gemini-key");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "Rate limit exceeded.",
+              type: "rate_limit_error",
+            },
+          }),
+          {
+            status: 429,
+            headers: { "retry-after": "12" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: "Fallback answer.",
+                },
+              },
+            ],
+          }),
+        ),
+      );
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: "Hello" }],
+        tools: [],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "Fallback answer.",
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.groq.com/openai/v1/responses",
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer groq-key",
+        },
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer gemini-key",
+        },
+        body: JSON.stringify({
+          model: "gemini-flash-latest",
+          messages: [{ role: "user", content: "Hello" }],
+        }),
+      }),
+    );
+  });
 });
 
 describe("requestOllamaChatWithTools", () => {

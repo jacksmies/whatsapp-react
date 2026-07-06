@@ -1,4 +1,8 @@
 import {
+  getFallbackModelApiKey,
+  getFallbackModelBaseUrl,
+  getFallbackModelName,
+  getFallbackModelReasoningEffort,
   getModelApiKey,
   getModelBaseUrl,
   getModelReasoningEffort,
@@ -44,6 +48,14 @@ type RequestWithToolsInput = BuildPayloadInput & {
   maxToolRounds?: number;
 };
 
+type ProviderConfig = {
+  label: "primary" | "fallback";
+  model: string;
+  baseUrl: string;
+  apiKey?: string;
+  reasoningEffort?: string;
+};
+
 type OllamaResponse = {
   message?: {
     role?: string;
@@ -66,6 +78,8 @@ type OllamaResponse = {
     total_token_count?: number;
   };
 };
+
+type ModelResponse = OllamaResponse & OpenAIChatCompletionsResponse;
 
 type OpenAIResponsesInput =
   | {
@@ -108,6 +122,42 @@ type OpenAIResponsesResponse = OllamaResponse & {
     | {
         message?: string;
       };
+};
+
+type OpenAIChatToolCall = {
+  id: string;
+  type?: "function";
+  function: {
+    name: string;
+    arguments?: string;
+  };
+};
+
+type OpenAIChatRequestMessage =
+  | {
+      role: ChatRole;
+      content: string;
+    }
+  | {
+      role: "assistant";
+      content: string | null;
+      tool_calls: OpenAIChatToolCall[];
+    }
+  | {
+      role: "tool";
+      tool_call_id: string;
+      name: string;
+      content: string;
+    };
+
+type OpenAIChatCompletionsResponse = {
+  choices?: Array<{
+    message?: {
+      role?: string;
+      content?: string | null;
+      tool_calls?: OpenAIChatToolCall[];
+    };
+  }>;
 };
 
 type OllamaRequestMessage =
@@ -185,6 +235,53 @@ function logToolError(label: string, details: Record<string, unknown>) {
   console.error(`[ollama-tools] ${label}`, details);
 }
 
+class ModelProviderError extends Error {
+  status: number;
+  retryAfter: string | null;
+
+  constructor({
+    message,
+    status,
+    retryAfter,
+  }: {
+    message: string;
+    status: number;
+    retryAfter: string | null;
+  }) {
+    super(message);
+    this.name = "ModelProviderError";
+    this.status = status;
+    this.retryAfter = retryAfter;
+  }
+}
+
+function primaryProviderConfig(model: string): ProviderConfig {
+  return {
+    label: "primary",
+    model,
+    baseUrl: getModelBaseUrl(),
+    apiKey: getModelApiKey(),
+    reasoningEffort: getModelReasoningEffort(),
+  };
+}
+
+function fallbackProviderConfig() {
+  const baseUrl = getFallbackModelBaseUrl();
+  const model = getFallbackModelName();
+
+  if (!baseUrl || !model) {
+    return null;
+  }
+
+  return {
+    label: "fallback" as const,
+    model,
+    baseUrl,
+    apiKey: getFallbackModelApiKey(),
+    reasoningEffort: getFallbackModelReasoningEffort(),
+  };
+}
+
 function extractTokenUsage(data: OllamaResponse) {
   const promptTokens =
     data.usage?.prompt_tokens ??
@@ -234,6 +331,26 @@ function shouldUseOpenAIResponses(baseUrl: string) {
   return trimmed.endsWith("/responses") || trimmed.endsWith("/v1");
 }
 
+function resolveOpenAIChatCompletionsUrl(baseUrl: string) {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+
+  if (trimmed.endsWith("/chat/completions")) {
+    return trimmed;
+  }
+
+  return `${trimmed}/chat/completions`;
+}
+
+function shouldUseOpenAIChatCompletions(baseUrl: string) {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+
+  return (
+    trimmed.endsWith("/chat/completions") ||
+    trimmed.endsWith("/openai") ||
+    trimmed.endsWith("/openai/")
+  );
+}
+
 function normalizeInitialMessages(messages: ChatMessage[]) {
   return messages
     .filter((message) => isChatRole(message.role))
@@ -262,17 +379,15 @@ function buildOllamaToolPayload({
     keep_alive: -1,
     stream: false,
     messages,
-    tools: buildToolSchemas(tools),
+    ...(tools.length > 0 ? { tools: buildToolSchemas(tools) } : {}),
   };
 }
 
-async function postOllamaPayload(payload: unknown) {
-  return postModelPayload(getModelBaseUrl(), payload);
-}
-
-async function postModelPayload(url: string, payload: unknown) {
-  const apiKey = getModelApiKey();
-
+async function postModelPayload(
+  url: string,
+  payload: unknown,
+  apiKey?: string,
+) {
   logToolDebug("provider-request", {
     url,
     hasApiKey: Boolean(apiKey),
@@ -294,12 +409,17 @@ async function postModelPayload(url: string, payload: unknown) {
       url,
       status: response.status,
       statusText: response.statusText,
+      retryAfter: response.headers.get("retry-after"),
       responseBody: preview(details),
     });
-    throw new Error(details || "Ollama request failed.");
+    throw new ModelProviderError({
+      message: details || "Model provider request failed.",
+      status: response.status,
+      retryAfter: response.headers.get("retry-after"),
+    });
   }
 
-  const data = (await response.json()) as OllamaResponse;
+  const data = (await response.json()) as ModelResponse;
   const usage = extractTokenUsage(data);
 
   if (usage) {
@@ -321,13 +441,13 @@ function buildOpenAIResponsesPayload({
   model,
   input,
   tools,
+  reasoningEffort,
 }: {
   model: string;
   input: OpenAIResponsesInput[];
   tools: ToolDefinition[];
+  reasoningEffort?: string;
 }) {
-  const reasoningEffort = getModelReasoningEffort();
-
   return {
     model,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
@@ -401,18 +521,17 @@ function openAIResponsesErrorMessage(data: OpenAIResponsesResponse) {
 }
 
 async function requestOpenAIResponsesWithTools({
-  model,
   messages,
   tools,
   maxToolRounds = 3,
-}: RequestWithToolsInput) {
-  const modelBaseUrl = getModelBaseUrl();
-  const responsesUrl = resolveOpenAIResponsesUrl(modelBaseUrl);
+}: RequestWithToolsInput, provider: ProviderConfig) {
+  const responsesUrl = resolveOpenAIResponsesUrl(provider.baseUrl);
   const toolMap = new Map(tools.map((tool) => [tool.function.name, tool]));
   const input: OpenAIResponsesInput[] = normalizeInitialMessages(messages);
 
   logToolDebug("responses-start", {
-    model,
+    model: provider.model,
+    provider: provider.label,
     url: responsesUrl,
     tools: tools.map((tool) => tool.function.name),
     messageRoles: input.map((message) => ("role" in message ? message.role : message.type)),
@@ -422,10 +541,12 @@ async function requestOpenAIResponsesWithTools({
     const data = (await postModelPayload(
       responsesUrl,
       buildOpenAIResponsesPayload({
-        model,
+        model: provider.model,
         input,
         tools,
+        reasoningEffort: provider.reasoningEffort,
       }),
+      provider.apiKey,
     )) as OpenAIResponsesResponse;
     const functionCalls = parseOpenAIResponsesFunctionCalls(data);
 
@@ -484,22 +605,139 @@ async function requestOpenAIResponsesWithTools({
   throw new Error("OpenAI Responses exceeded the maximum number of tool rounds.");
 }
 
+async function requestOpenAIChatCompletionsWithTools({
+  messages,
+  tools,
+  maxToolRounds = 3,
+}: RequestWithToolsInput, provider: ProviderConfig) {
+  const chatCompletionsUrl = resolveOpenAIChatCompletionsUrl(provider.baseUrl);
+  const toolMap = new Map(tools.map((tool) => [tool.function.name, tool]));
+  const requestMessages: OpenAIChatRequestMessage[] =
+    normalizeInitialMessages(messages);
+
+  logToolDebug("chat-completions-start", {
+    model: provider.model,
+    provider: provider.label,
+    url: chatCompletionsUrl,
+    tools: tools.map((tool) => tool.function.name),
+    messageRoles: requestMessages.map((message) => message.role),
+  });
+
+  for (let round = 0; round <= maxToolRounds; round += 1) {
+    const data = (await postModelPayload(
+      chatCompletionsUrl,
+      {
+        model: provider.model,
+        messages: requestMessages,
+        ...(tools.length > 0 ? { tools: buildToolSchemas(tools) } : {}),
+      },
+      provider.apiKey,
+    )) as OpenAIChatCompletionsResponse;
+    const message = data.choices?.[0]?.message;
+    const toolCalls = message?.tool_calls ?? [];
+
+    logToolDebug("chat-completions-response", {
+      round,
+      content: preview(message?.content ?? ""),
+      toolCalls: toolCalls.map((toolCall) => ({
+        name: toolCall.function.name,
+        arguments: toolCall.function.arguments ?? "",
+      })),
+    });
+
+    if (toolCalls.length === 0) {
+      const content = message?.content?.trim();
+
+      if (!content) {
+        throw new Error("OpenAI Chat Completions returned an empty response.");
+      }
+
+      return {
+        role: "assistant" as const,
+        content,
+      };
+    }
+
+    requestMessages.push({
+      role: "assistant",
+      content: message?.content ?? null,
+      tool_calls: toolCalls,
+    });
+
+    for (const toolCall of toolCalls) {
+      const tool = toolMap.get(toolCall.function.name);
+      const args = parseOpenAIResponsesArguments(toolCall.function.arguments);
+      const result = tool
+        ? await tool.execute(args)
+        : { error: `Unknown tool: ${toolCall.function.name}` };
+      const content =
+        typeof result === "string" ? result : JSON.stringify(result);
+
+      requestMessages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content,
+      });
+    }
+  }
+
+  throw new Error(
+    "OpenAI Chat Completions exceeded the maximum number of tool rounds.",
+  );
+}
+
+async function requestProviderChatWithTools(
+  input: RequestWithToolsInput,
+  provider: ProviderConfig,
+) {
+  if (shouldUseOpenAIResponses(provider.baseUrl)) {
+    return requestOpenAIResponsesWithTools(input, provider);
+  }
+
+  if (shouldUseOpenAIChatCompletions(provider.baseUrl)) {
+    return requestOpenAIChatCompletionsWithTools(input, provider);
+  }
+
+  return requestOllamaChatWithToolsUsingProvider(input, provider);
+}
+
+async function withRateLimitFallback(
+  input: RequestWithToolsInput,
+  request: (provider: ProviderConfig) => Promise<{
+    role: "assistant";
+    content: string;
+  }>,
+) {
+  const primary = primaryProviderConfig(input.model);
+
+  try {
+    return await request(primary);
+  } catch (error) {
+    const fallback = fallbackProviderConfig();
+
+    if (
+      !(error instanceof ModelProviderError) ||
+      error.status !== 429 ||
+      !fallback
+    ) {
+      throw error;
+    }
+
+    logToolError("provider-fallback", {
+      from: primary.baseUrl,
+      to: fallback.baseUrl,
+      retryAfter: error.retryAfter,
+    });
+
+    return request(fallback);
+  }
+}
+
 export async function requestOllamaChat(input: BuildPayloadInput) {
-  if (shouldUseOpenAIResponses(getModelBaseUrl())) {
-    return requestOpenAIResponsesWithTools({ ...input, tools: [] });
-  }
-
-  const data = await postOllamaPayload(buildOllamaPayload(input));
-  const content = data.message?.content?.trim();
-
-  if (!content) {
-    throw new Error(data.error || "Ollama returned an empty response.");
-  }
-
-  return {
-    role: "assistant" as const,
-    content,
-  };
+  return withRateLimitFallback({ ...input, tools: [] }, (provider) =>
+    requestProviderChatWithTools({ ...input, tools: [] }, provider),
+  );
 }
 
 export async function requestOllamaChatWithTools({
@@ -508,20 +746,37 @@ export async function requestOllamaChatWithTools({
   tools,
   maxToolRounds = 3,
 }: RequestWithToolsInput) {
-  if (shouldUseOpenAIResponses(getModelBaseUrl())) {
-    return requestOpenAIResponsesWithTools({
+  return withRateLimitFallback(
+    {
       model,
       messages,
       tools,
       maxToolRounds,
-    });
-  }
+    },
+    (provider) =>
+      requestProviderChatWithTools(
+        {
+          model,
+          messages,
+          tools,
+          maxToolRounds,
+        },
+        provider,
+      ),
+  );
+}
 
+async function requestOllamaChatWithToolsUsingProvider({
+  messages,
+  tools,
+  maxToolRounds = 3,
+}: RequestWithToolsInput, provider: ProviderConfig) {
   const toolMap = new Map(tools.map((tool) => [tool.function.name, tool]));
   const requestMessages: OllamaRequestMessage[] = normalizeInitialMessages(messages);
 
   logToolDebug("start", {
-    model,
+    model: provider.model,
+    provider: provider.label,
     tools: tools.map((tool) => tool.function.name),
     messageRoles: requestMessages.map((message) => message.role),
   });
@@ -533,8 +788,14 @@ export async function requestOllamaChatWithTools({
       lastMessage: preview(requestMessages.at(-1)),
     });
 
-    const data = await postOllamaPayload(
-      buildOllamaToolPayload({ model, messages: requestMessages, tools }),
+    const data = await postModelPayload(
+      provider.baseUrl,
+      buildOllamaToolPayload({
+        model: provider.model,
+        messages: requestMessages,
+        tools,
+      }),
+      provider.apiKey,
     );
     const toolCalls = data.message?.tool_calls ?? [];
 

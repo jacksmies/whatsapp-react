@@ -35,3 +35,19 @@ export function getModelApiKey() {
 export function getModelReasoningEffort() {
   return firstConfiguredValue(process.env.MODEL_REASONING_EFFORT);
 }
+
+export function getFallbackModelBaseUrl() {
+  return firstConfiguredValue(process.env.MODEL_FALLBACK_BASE_URL);
+}
+
+export function getFallbackModelName() {
+  return firstConfiguredValue(process.env.MODEL_FALLBACK_NAME);
+}
+
+export function getFallbackModelApiKey() {
+  return firstConfiguredValue(process.env.MODEL_FALLBACK_API_KEY);
+}
+
+export function getFallbackModelReasoningEffort() {
+  return firstConfiguredValue(process.env.MODEL_FALLBACK_REASONING_EFFORT);
+}
