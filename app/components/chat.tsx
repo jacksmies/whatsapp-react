@@ -16,6 +16,7 @@ type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  createdAt: Date;
 };
 
 type ChatResponse = {
@@ -32,6 +33,7 @@ const initialMessages: ChatMessage[] = [
     id: "welcome",
     role: "assistant",
     content: "Hi. Ask me anything about Klaster.",
+    createdAt: new Date(),
   },
 ];
 
@@ -40,6 +42,7 @@ function createMessage(role: ChatRole, content: string): ChatMessage {
     id: `${role}-${Date.now()}-${crypto.randomUUID()}`,
     role,
     content,
+    createdAt: new Date(),
   };
 }
 
