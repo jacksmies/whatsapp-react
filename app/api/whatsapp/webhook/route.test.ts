@@ -7,7 +7,8 @@ import {
   saveMessage,
   saveMessageIfNew,
 } from "../../../../lib/chat-repository";
-import { requestOllamaChat } from "../../../../lib/ollama";
+import { requestOllamaChatWithTools } from "../../../../lib/ollama";
+import { academyTools } from "../../../../lib/tools/registry";
 import { sendWhatsAppTextMessage } from "../../../../lib/whatsapp";
 import { GET, POST } from "./route";
 
@@ -23,7 +24,27 @@ vi.mock("../../../../lib/chat-repository", () => ({
 }));
 
 vi.mock("../../../../lib/ollama", () => ({
-  requestOllamaChat: vi.fn(),
+  requestOllamaChatWithTools: vi.fn(),
+}));
+
+vi.mock("../../../../lib/tools/registry", () => ({
+  academyTools: [
+    {
+      type: "function",
+      function: {
+        name: "list_course_availability",
+        description: "List available course dates.",
+        parameters: {
+          type: "object",
+          required: ["courseTitle"],
+          properties: {
+            courseTitle: { type: "string" },
+          },
+        },
+      },
+      execute: vi.fn(),
+    },
+  ],
 }));
 
 vi.mock("../../../../lib/whatsapp", () => ({
@@ -37,7 +58,7 @@ const findOrCreateWhatsAppConversationMock = vi.mocked(
 const getConversationMessagesMock = vi.mocked(getConversationMessages);
 const saveMessageMock = vi.mocked(saveMessage);
 const saveMessageIfNewMock = vi.mocked(saveMessageIfNew);
-const requestOllamaChatMock = vi.mocked(requestOllamaChat);
+const requestOllamaChatWithToolsMock = vi.mocked(requestOllamaChatWithTools);
 const sendWhatsAppTextMessageMock = vi.mocked(sendWhatsAppTextMessage);
 
 function signedRequest(body: object) {
@@ -144,7 +165,7 @@ describe("WhatsApp webhook", () => {
         createdAt: new Date("2026-07-04T09:00:00.000Z"),
       },
     ]);
-    requestOllamaChatMock.mockResolvedValue({
+    requestOllamaChatWithToolsMock.mockResolvedValue({
       role: "assistant",
       content: "AI WhatsApp reply",
     });
@@ -166,9 +187,10 @@ describe("WhatsApp webhook", () => {
       content: "Hello from WhatsApp",
       externalMessageId: "wamid.inbound",
     });
-    expect(requestOllamaChatMock).toHaveBeenCalledWith({
+    expect(requestOllamaChatWithToolsMock).toHaveBeenCalledWith({
       model: "llama3.2",
       messages: [{ role: "user", content: "Hello from WhatsApp" }],
+      tools: academyTools,
     });
     expect(sendWhatsAppTextMessageMock).toHaveBeenCalledWith({
       to: "971501234567",
@@ -212,7 +234,7 @@ describe("WhatsApp webhook", () => {
         createdAt: new Date("2026-07-04T09:00:00.000Z"),
       },
     ]);
-    requestOllamaChatMock.mockResolvedValue({
+    requestOllamaChatWithToolsMock.mockResolvedValue({
       role: "assistant",
       content: "AI WhatsApp reply",
     });
@@ -227,9 +249,10 @@ describe("WhatsApp webhook", () => {
       knowledge: expect.any(String),
       messages: [{ role: "user", content: "Hello from WhatsApp" }],
     });
-    expect(requestOllamaChatMock).toHaveBeenCalledWith({
+    expect(requestOllamaChatWithToolsMock).toHaveBeenCalledWith({
       model: "llama3.2",
       messages: [{ role: "user", content: "Hello from WhatsApp" }],
+      tools: academyTools,
     });
     expect(sendWhatsAppTextMessageMock).toHaveBeenCalledWith({
       to: "971501234567",

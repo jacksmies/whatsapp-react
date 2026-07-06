@@ -1,17 +1,38 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { saveMessage } from "../../../lib/chat-repository";
-import { requestOllamaChat } from "../../../lib/ollama";
+import { requestOllamaChatWithTools } from "../../../lib/ollama";
+import { academyTools } from "../../../lib/tools/registry";
 import { POST } from "./route";
 
 vi.mock("../../../lib/ollama", () => ({
-  requestOllamaChat: vi.fn(),
+  requestOllamaChatWithTools: vi.fn(),
+}));
+
+vi.mock("../../../lib/tools/registry", () => ({
+  academyTools: [
+    {
+      type: "function",
+      function: {
+        name: "list_course_availability",
+        description: "List available course dates.",
+        parameters: {
+          type: "object",
+          required: ["courseTitle"],
+          properties: {
+            courseTitle: { type: "string" },
+          },
+        },
+      },
+      execute: vi.fn(),
+    },
+  ],
 }));
 
 vi.mock("../../../lib/chat-repository", () => ({
   saveMessage: vi.fn(),
 }));
 
-const requestOllamaChatMock = vi.mocked(requestOllamaChat);
+const requestOllamaChatWithToolsMock = vi.mocked(requestOllamaChatWithTools);
 const saveMessageMock = vi.mocked(saveMessage);
 
 describe("POST /api/chat", () => {
@@ -48,7 +69,7 @@ describe("POST /api/chat", () => {
   });
 
   it("returns the assistant message from Ollama after adding academy knowledge and memory", async () => {
-    requestOllamaChatMock.mockResolvedValue({
+    requestOllamaChatWithToolsMock.mockResolvedValue({
       role: "assistant",
       content: "Hello from the model",
     });
@@ -73,7 +94,7 @@ describe("POST /api/chat", () => {
       model: "llama3.2",
     });
     expect(response.status).toBe(200);
-    expect(requestOllamaChatMock).toHaveBeenCalledWith({
+    expect(requestOllamaChatWithToolsMock).toHaveBeenCalledWith({
       model: "llama3.2",
       messages: [
         {
@@ -84,8 +105,9 @@ describe("POST /api/chat", () => {
         { role: "assistant", content: "Dubai Knowledge Park." },
         { role: "user", content: "hello" },
       ],
+      tools: academyTools,
     });
-    expect(requestOllamaChatMock).toHaveBeenCalledWith({
+    expect(requestOllamaChatWithToolsMock).toHaveBeenCalledWith({
       model: "llama3.2",
       messages: expect.arrayContaining([
         {
@@ -93,6 +115,7 @@ describe("POST /api/chat", () => {
           content: expect.stringContaining("Customer question:\nhello"),
         },
       ]),
+      tools: academyTools,
     });
     expect(saveMessageMock).toHaveBeenNthCalledWith(1, {
       conversationId: "conversation-1",
@@ -120,7 +143,7 @@ describe("POST /api/chat", () => {
       error: "Request body must include a conversationId.",
     });
     expect(response.status).toBe(400);
-    expect(requestOllamaChatMock).not.toHaveBeenCalled();
+    expect(requestOllamaChatWithToolsMock).not.toHaveBeenCalled();
     expect(saveMessageMock).not.toHaveBeenCalled();
   });
 });

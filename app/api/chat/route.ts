@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildAcademyMessages } from "../../../lib/academy-chat";
 import { saveMessage } from "../../../lib/chat-repository";
-import { requestOllamaChat, type ChatMessage } from "../../../lib/ollama";
+import {
+  requestOllamaChatWithTools,
+  type ChatMessage,
+} from "../../../lib/ollama";
+import { academyTools } from "../../../lib/tools/registry";
 
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2";
 const KNOWLEDGE_PATH = join(process.cwd(), "content", "knowledge.md");
@@ -56,12 +60,13 @@ export async function POST(request: Request) {
       content: userMessage.content.trim(),
     });
 
-    const message = await requestOllamaChat({
+    const message = await requestOllamaChatWithTools({
       model: DEFAULT_MODEL,
       messages: buildAcademyMessages({
         knowledge: KNOWLEDGE_BASE,
         messages: body.messages,
       }),
+      tools: academyTools,
     });
 
     await saveMessage({

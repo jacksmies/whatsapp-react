@@ -1,5 +1,7 @@
 import {
   boolean,
+  date,
+  integer,
   jsonb,
   timestamp,
   uuid,
@@ -68,3 +70,16 @@ export const messages = pgTable(
     ),
   ],
 );
+
+export const courses = pgTable("courses", {
+  id: uuid("id").primaryKey().notNull(),
+  title: text("title").notNull(),
+  startDate: date("start_date").notNull(),
+  availability: integer("availability").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});

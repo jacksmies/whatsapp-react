@@ -130,16 +130,6 @@ The fee includes all 8 sessions and classroom materials.
 
 Payment plans or discounts must be handled by a human advisor.
 
-## Available Timings
-
-Weekday batch:
-Tuesday and Thursday, 5:00 PM – 6:30 PM
-
-Weekend batch:
-Saturday, 10:00 AM – 11:30 AM
-
-Seat availability should be confirmed by a human advisor before registration.
-
 ## Common Questions
 
 Question: Does my child need previous experience?
@@ -200,16 +190,6 @@ The Junior AI and Coding course fee is AED 1,500.
 
 Discounts, sibling offers, or payment plans must be handled by a human advisor.
 
-## Available Timings
-
-Weekend batch:
-Saturday, 12:30 PM – 2:30 PM
-
-Weekday batch:
-Wednesday, 5:00 PM – 7:00 PM
-
-Seat availability should be confirmed before registration.
-
 ## Common Questions
 
 Question: Does my child need to know coding already?
@@ -246,7 +226,6 @@ The chatbot should hand off to a human when the customer asks about:
 - Payment
 - Discounts
 - Refunds
-- Seat availability
 - Special age cases
 - Complaints
 - Speaking to a person

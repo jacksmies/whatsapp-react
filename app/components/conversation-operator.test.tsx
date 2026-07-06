@@ -55,7 +55,7 @@ describe("ConversationOperator", () => {
       screen.getByPlaceholderText("Write a human reply..."),
       "A human reply",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Send to WhatsApp" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await screen.findByText("A human reply");
 

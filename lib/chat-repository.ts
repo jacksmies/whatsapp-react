@@ -69,6 +69,33 @@ export type ContactDetail = {
   aiAutoReplyEnabled: boolean;
 };
 
+export type CourseAvailability = {
+  id: string;
+  title: string;
+  startDate: Date;
+  availability: number;
+};
+
+const MONTH_NAMES = new Map([
+  ["january", 0],
+  ["february", 1],
+  ["march", 2],
+  ["april", 3],
+  ["may", 4],
+  ["june", 5],
+  ["july", 6],
+  ["august", 7],
+  ["september", 8],
+  ["october", 9],
+  ["november", 10],
+  ["december", 11],
+]);
+
+export type ConversationContact = {
+  id: string;
+  phoneNumber: string;
+};
+
 function toDate(value: Date | string) {
   return value instanceof Date ? value : new Date(value);
 }
@@ -351,6 +378,96 @@ export async function getContactDetail(
     messageCount: record.messageCount,
     aiAutoReplyEnabled: Boolean(record.aiAutoReplyEnabled),
   };
+}
+
+export async function getContactForConversation(
+  conversationId: string,
+): Promise<ConversationContact | null> {
+  const result = await getDb().execute(sql`
+    select
+      ct.id,
+      ct.phone_number as "phoneNumber"
+    from conversations c
+    join contacts ct on c.channel = 'whatsapp'
+      and c.external_contact_id = ct.phone_number
+    where c.id = ${conversationId}
+    limit 1
+  `);
+
+  const record = result.rows[0] as
+    | {
+        id: string;
+        phoneNumber: string;
+      }
+    | undefined;
+
+  return record
+    ? {
+        id: record.id,
+        phoneNumber: record.phoneNumber,
+      }
+    : null;
+}
+
+export async function listCourseAvailability({
+  courseTitle,
+  month,
+  year,
+}: {
+  courseTitle: string;
+  month?: string;
+  year?: number;
+}): Promise<CourseAvailability[]> {
+  const normalizedTitle = courseTitle.trim().toLowerCase();
+  const monthIndex =
+    typeof month === "string"
+      ? MONTH_NAMES.get(month.trim().toLowerCase())
+      : undefined;
+
+  if (!normalizedTitle) {
+    return [];
+  }
+
+  const result = await getDb().execute(sql`
+    select
+      c.id,
+      c.title,
+      c.start_date as "startDate",
+      c.availability
+    from courses c
+    where lower(c.title) like ${`%${normalizedTitle}%`}
+      and c.availability > 0
+      and c.start_date >= current_date
+    order by c.start_date asc
+  `);
+
+  return result.rows
+    .map((row) => {
+      const record = row as {
+        id: string;
+        title: string;
+        startDate: Date | string;
+        availability: number;
+      };
+
+      return {
+        id: record.id,
+        title: record.title,
+        startDate: toDate(record.startDate),
+        availability: record.availability,
+      };
+    })
+    .filter((course) => {
+      if (monthIndex !== undefined && course.startDate.getUTCMonth() !== monthIndex) {
+        return false;
+      }
+
+      if (year !== undefined && course.startDate.getUTCFullYear() !== year) {
+        return false;
+      }
+
+      return true;
+    });
 }
 
 export async function updateContact(

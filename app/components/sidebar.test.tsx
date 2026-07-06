@@ -37,4 +37,10 @@ describe("Sidebar", () => {
       within(secondaryNavigation).getByRole("link", { name: "Settings" }),
     ).toHaveAttribute("href", "/settings");
   });
+
+  it("shows the WhatsApp icon in the mobile and desktop brand marks", () => {
+    render(<Sidebar />);
+
+    expect(screen.getAllByRole("img", { name: "WhatsApp" })).toHaveLength(2);
+  });
 });

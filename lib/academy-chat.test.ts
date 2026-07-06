@@ -3,19 +3,33 @@ import { buildAcademyMessages, buildSystemPromptWithKnowledge } from "./academy-
 
 describe("buildSystemPromptWithKnowledge", () => {
   it("adds the knowledge base and current customer question to the system prompt", () => {
-    expect(
-      buildSystemPromptWithKnowledge({
-        knowledge: "Course fee is AED 1,200.",
-        question: "How much is public speaking?",
-      }),
-    ).toContain("Course fee is AED 1,200.");
+    const prompt = buildSystemPromptWithKnowledge({
+      knowledge: "Course fee is AED 1,200.",
+      question: "How much is public speaking?",
+    });
 
-    expect(
-      buildSystemPromptWithKnowledge({
-        knowledge: "Course fee is AED 1,200.",
-        question: "How much is public speaking?",
-      }),
-    ).toContain("Customer question:\nHow much is public speaking?");
+    expect(prompt).toContain("Course fee is AED 1,200.");
+    expect(prompt).toContain("Customer question:\nHow much is public speaking?");
+    expect(prompt).toContain(
+      "Use list_course_availability when the customer asks about available course dates or seats.",
+    );
+  });
+
+  it("requires course availability answers to come from the availability tool only", () => {
+    const prompt = buildSystemPromptWithKnowledge({
+      knowledge: "The Public Speaking course has weekend batches.",
+      question: "What availability do you have for public speaking?",
+    });
+
+    expect(prompt).toContain(
+      "Never invent course dates, batch times, seat counts, or availability.",
+    );
+    expect(prompt).toContain(
+      "If list_course_availability returns no courses, say that no available dates are currently listed and offer to connect a human advisor.",
+    );
+    expect(prompt).toContain(
+      "When the customer mentions a month or year, include that month or year in the list_course_availability tool arguments.",
+    );
   });
 });
 

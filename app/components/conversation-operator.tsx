@@ -83,12 +83,7 @@ export function ConversationOperator({
         });
         const data = (await response.json()) as ConversationRefreshResponse;
 
-        if (
-          cancelled ||
-          !response.ok ||
-          !data.conversation ||
-          !data.messages
-        ) {
+        if (cancelled || !response.ok || !data.conversation || !data.messages) {
           return;
         }
 
@@ -255,7 +250,7 @@ export function ConversationOperator({
               disabled={!canSend}
               className="h-14 rounded-lg bg-emerald-800 px-5 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600"
             >
-              {isSending ? "Sending..." : "Send to WhatsApp"}
+              {isSending ? "Sending..." : "Send"}
             </button>
           </div>
         ) : (

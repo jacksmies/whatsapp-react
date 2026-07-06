@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { FaWhatsapp } from "react-icons/fa";
 
 type NavItem = {
   label: string;
@@ -146,6 +147,14 @@ const secondaryLinks: NavItem[] = [
   { label: "Settings", href: "/settings", icon: <IconSettings /> },
 ];
 
+function BrandIcon() {
+  return (
+    <span className="sidebar-logo" role="img" aria-label="WhatsApp">
+      <FaWhatsapp aria-hidden="true" focusable="false" />
+    </span>
+  );
+}
+
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -200,7 +209,7 @@ export default function Sidebar() {
           <IconMenu />
         </button>
         <div className="mobile-topbar-brand">
-          <span className="sidebar-logo" aria-hidden="true" />
+          <BrandIcon />
           <span>Klaster Chat</span>
         </div>
       </header>
@@ -221,7 +230,7 @@ export default function Sidebar() {
       >
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <span className="sidebar-logo" aria-hidden="true" />
+            <BrandIcon />
             {!collapsed && (
               <span className="sidebar-brand-text">Klaster Chat</span>
             )}

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildOllamaPayload, requestOllamaChat } from "./ollama";
+import {
+  buildOllamaPayload,
+  requestOllamaChat,
+  requestOllamaChatWithTools,
+} from "./ollama";
 
 describe("buildOllamaPayload", () => {
   it("keeps only supported message roles and trims content", () => {
@@ -85,5 +89,146 @@ describe("requestOllamaChat", () => {
         messages: [{ role: "user", content: "hello" }],
       }),
     ).rejects.toThrow("model not found");
+  });
+});
+
+describe("requestOllamaChatWithTools", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("executes model-requested tools and sends tool results back to Ollama", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            message: {
+              role: "assistant",
+              content: "",
+              tool_calls: [
+                {
+                  type: "function",
+                  function: {
+                    name: "list_course_availability",
+                    arguments: { courseTitle: "public speaking" },
+                  },
+                },
+              ],
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            message: {
+              role: "assistant",
+              content: "The public speaking course has 8 seats available.",
+            },
+          }),
+        ),
+      );
+
+    const execute = vi.fn().mockResolvedValue([
+      {
+        title: "Public Speaking Course",
+        startDate: "2026-08-15",
+        availability: 8,
+      },
+    ]);
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "qwen3",
+        messages: [{ role: "user", content: "When is public speaking open?" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "list_course_availability",
+              description: "List available course dates.",
+              parameters: {
+                type: "object",
+                required: ["courseTitle"],
+                properties: {
+                  courseTitle: { type: "string" },
+                },
+              },
+            },
+            execute,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "The public speaking course has 8 seats available.",
+    });
+
+    expect(execute).toHaveBeenCalledWith({ courseTitle: "public speaking" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      model: "qwen3",
+      keep_alive: -1,
+      stream: false,
+      messages: [{ role: "user", content: "When is public speaking open?" }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "list_course_availability",
+            description: "List available course dates.",
+            parameters: {
+              type: "object",
+              required: ["courseTitle"],
+              properties: {
+                courseTitle: { type: "string" },
+              },
+            },
+          },
+        },
+      ],
+    });
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
+      model: "qwen3",
+      keep_alive: -1,
+      stream: false,
+      messages: [
+        { role: "user", content: "When is public speaking open?" },
+        {
+          role: "assistant",
+          tool_calls: [
+            {
+              type: "function",
+              function: {
+                name: "list_course_availability",
+                arguments: { courseTitle: "public speaking" },
+              },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          tool_name: "list_course_availability",
+          content:
+            '[{"title":"Public Speaking Course","startDate":"2026-08-15","availability":8}]',
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "list_course_availability",
+            description: "List available course dates.",
+            parameters: {
+              type: "object",
+              required: ["courseTitle"],
+              properties: {
+                courseTitle: { type: "string" },
+              },
+            },
+          },
+        },
+      ],
+    });
   });
 });

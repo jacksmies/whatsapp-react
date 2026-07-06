@@ -9,7 +9,11 @@ import {
   saveMessage,
   saveMessageIfNew,
 } from "../../../../lib/chat-repository";
-import { requestOllamaChat, type ChatMessage } from "../../../../lib/ollama";
+import {
+  requestOllamaChatWithTools,
+  type ChatMessage,
+} from "../../../../lib/ollama";
+import { academyTools } from "../../../../lib/tools/registry";
 import { sendWhatsAppTextMessage } from "../../../../lib/whatsapp";
 
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2";
@@ -149,12 +153,13 @@ async function handleInboundTextMessage(message: ParsedInboundTextMessage) {
     role,
     content,
   }));
-  const assistantMessage = await requestOllamaChat({
+  const assistantMessage = await requestOllamaChatWithTools({
     model: process.env.OLLAMA_MODEL ?? DEFAULT_MODEL,
     messages: buildAcademyMessages({
       knowledge: KNOWLEDGE_BASE,
       messages: chatMessages,
     }),
+    tools: academyTools,
   });
   const { messageId } = await sendWhatsAppTextMessage({
     to: message.from,

@@ -95,12 +95,15 @@ textarea {
 }
 
 .sidebar-logo {
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  box-shadow: 0 1px 3px rgb(34 197 94 / 30%);
+  color: #25d366;
+  font-size: 26px;
+  line-height: 1;
 }
 
 .sidebar-brand-text {
