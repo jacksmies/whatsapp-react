@@ -13,10 +13,10 @@ import {
   requestOllamaChatWithTools,
   type ChatMessage,
 } from "../../../../lib/ollama";
+import { getModelName } from "../../../../lib/model-config";
 import { academyTools } from "../../../../lib/tools/registry";
 import { sendWhatsAppTextMessage } from "../../../../lib/whatsapp";
 
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2";
 const KNOWLEDGE_PATH = join(process.cwd(), "content", "knowledge.md");
 const KNOWLEDGE_BASE = readFileSync(KNOWLEDGE_PATH, "utf8");
 
@@ -154,7 +154,7 @@ async function handleInboundTextMessage(message: ParsedInboundTextMessage) {
     content,
   }));
   const assistantMessage = await requestOllamaChatWithTools({
-    model: process.env.OLLAMA_MODEL ?? DEFAULT_MODEL,
+    model: getModelName(),
     messages: buildAcademyMessages({
       knowledge: KNOWLEDGE_BASE,
       messages: chatMessages,

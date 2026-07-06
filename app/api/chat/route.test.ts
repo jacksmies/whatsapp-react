@@ -38,6 +38,7 @@ const saveMessageMock = vi.mocked(saveMessage);
 describe("POST /api/chat", () => {
   afterEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("returns 400 when the body is not valid JSON", async () => {
@@ -127,6 +128,33 @@ describe("POST /api/chat", () => {
       role: "assistant",
       content: "Hello from the model",
     });
+  });
+
+  it("uses MODEL_NAME for the requested model when configured", async () => {
+    vi.stubEnv("MODEL_NAME", "gpt-4.1-mini");
+    requestOllamaChatWithToolsMock.mockResolvedValue({
+      role: "assistant",
+      content: "Hello from the configured model",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: "conversation-1",
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      model: "gpt-4.1-mini",
+    });
+    expect(requestOllamaChatWithToolsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gpt-4.1-mini",
+      }),
+    );
   });
 
   it("returns 400 when conversationId is missing", async () => {

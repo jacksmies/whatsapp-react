@@ -6,7 +6,7 @@ export type TranscriptMessage = {
   id: string;
   role: StoredMessageRole;
   content: string;
-  createdAt: Date;
+  createdAt?: Date;
 };
 
 function formatMessageTime(createdAt: Date) {
@@ -82,16 +82,18 @@ export function ChatTranscript({ messages }: { messages: TranscriptMessage[] }) 
           <div className="text-sm leading-6">
             <MarkdownMessage content={message.content} role={message.role} />
           </div>
-          <time
-            dateTime={message.createdAt.toISOString()}
-            className={
-              message.role === "user"
-                ? "mt-2 block text-right text-[11px] leading-none text-zinc-300"
-                : "mt-2 block text-right text-[11px] leading-none text-zinc-500"
-            }
-          >
-            {formatMessageTime(message.createdAt)}
-          </time>
+          {message.createdAt ? (
+            <time
+              dateTime={message.createdAt.toISOString()}
+              className={
+                message.role === "user"
+                  ? "mt-2 block text-right text-[11px] leading-none text-zinc-300"
+                  : "mt-2 block text-right text-[11px] leading-none text-zinc-500"
+              }
+            >
+              {formatMessageTime(message.createdAt)}
+            </time>
+          ) : null}
         </article>
       ))}
     </div>

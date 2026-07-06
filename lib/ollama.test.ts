@@ -45,6 +45,7 @@ describe("buildOllamaPayload", () => {
 describe("requestOllamaChat", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("posts a non-streaming chat request to Ollama", async () => {
@@ -79,6 +80,7 @@ describe("requestOllamaChat", () => {
   });
 
   it("reports unreachable Ollama responses", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("model not found", { status: 404 }),
     );
@@ -89,12 +91,194 @@ describe("requestOllamaChat", () => {
         messages: [{ role: "user", content: "hello" }],
       }),
     ).rejects.toThrow("model not found");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[ollama-tools] provider-error",
+      expect.objectContaining({
+        status: 404,
+        responseBody: "model not found",
+      }),
+    );
+  });
+
+  it("uses a configured model base URL and bearer API key", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://models.example.com/api/chat");
+    vi.stubEnv("MODEL_API_KEY", "test-api-key");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: { role: "assistant", content: "Hello from cloud" },
+        }),
+      ),
+    );
+
+    await requestOllamaChat({
+      model: "gpt-4.1-mini",
+      messages: [{ role: "user", content: "hello" }],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://models.example.com/api/chat",
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-api-key",
+        },
+      }),
+    );
+  });
+
+  it("logs token usage when the provider returns usage metadata", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: { role: "assistant", content: "Hello with usage" },
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 7,
+            total_tokens: 19,
+          },
+        }),
+      ),
+    );
+
+    await requestOllamaChat({
+      model: "gpt-4.1-mini",
+      messages: [{ role: "user", content: "hello" }],
+    });
+
+    expect(logSpy).toHaveBeenCalledWith("[ollama-tools] usage", {
+      promptTokens: 12,
+      completionTokens: 7,
+      totalTokens: 19,
+    });
+  });
+
+  it("posts OpenAI Responses payloads to Groq-compatible /responses endpoints", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://api.groq.com/openai/v1");
+    vi.stubEnv("MODEL_API_KEY", "groq-key");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output_text: "Fast models matter because they reduce latency.",
+          usage: {
+            input_tokens: 11,
+            output_tokens: 8,
+            total_tokens: 19,
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: "Explain fast models" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "list_course_availability",
+              description: "List available course dates.",
+              parameters: {
+                type: "object",
+                required: ["courseTitle"],
+                properties: {
+                  courseTitle: { type: "string" },
+                },
+              },
+            },
+            execute: vi.fn(),
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "Fast models matter because they reduce latency.",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.groq.com/openai/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer groq-key",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          input: [{ role: "user", content: "Explain fast models" }],
+          tools: [
+            {
+              type: "function",
+              name: "list_course_availability",
+              description: "List available course dates.",
+              parameters: {
+                type: "object",
+                required: ["courseTitle"],
+                properties: {
+                  courseTitle: { type: "string" },
+                },
+              },
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("can opt into Responses reasoning effort and logs reasoning separately", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://api.groq.com/openai/v1");
+    vi.stubEnv("MODEL_REASONING_EFFORT", "low");
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "reasoning",
+              summary: [
+                {
+                  type: "summary_text",
+                  text: "The user greeted us, so answer briefly.",
+                },
+              ],
+            },
+            {
+              type: "message",
+              content: [{ type: "output_text", text: "Hi there!" }],
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: "Hello" }],
+        tools: [],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "Hi there!",
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      model: "openai/gpt-oss-20b",
+      reasoning: { effort: "low" },
+      input: [{ role: "user", content: "Hello" }],
+    });
+    expect(logSpy).toHaveBeenCalledWith("[ollama-tools] reasoning", {
+      content: "The user greeted us, so answer briefly.",
+    });
   });
 });
 
 describe("requestOllamaChatWithTools", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("executes model-requested tools and sends tool results back to Ollama", async () => {

@@ -7,9 +7,9 @@ import {
   requestOllamaChatWithTools,
   type ChatMessage,
 } from "../../../lib/ollama";
+import { getModelName } from "../../../lib/model-config";
 import { academyTools } from "../../../lib/tools/registry";
 
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2";
 const KNOWLEDGE_PATH = join(process.cwd(), "content", "knowledge.md");
 const KNOWLEDGE_BASE = readFileSync(KNOWLEDGE_PATH, "utf8");
 
@@ -60,8 +60,9 @@ export async function POST(request: Request) {
       content: userMessage.content.trim(),
     });
 
+    const model = getModelName();
     const message = await requestOllamaChatWithTools({
-      model: DEFAULT_MODEL,
+      model,
       messages: buildAcademyMessages({
         knowledge: KNOWLEDGE_BASE,
         messages: body.messages,
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
       content: message.content,
     });
 
-    return NextResponse.json({ message, model: DEFAULT_MODEL });
+    return NextResponse.json({ message, model });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to contact Ollama.";

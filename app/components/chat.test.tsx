@@ -22,6 +22,15 @@ describe("Chat", () => {
     });
   });
 
+  it("does not render a timestamp for the static welcome message", () => {
+    render(<Chat />);
+
+    expect(
+      screen.getByText("Hi. Ask me anything about Klaster."),
+    ).toBeInTheDocument();
+    expect(document.querySelector("time")).not.toBeInTheDocument();
+  });
+
   it("scrolls to the latest message and keeps the input focused after a reply", async () => {
     const scrollIntoView = vi.fn();
     window.HTMLElement.prototype.scrollIntoView = scrollIntoView;

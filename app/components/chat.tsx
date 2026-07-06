@@ -16,7 +16,7 @@ type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
-  createdAt: Date;
+  createdAt?: Date;
 };
 
 type ChatResponse = {
@@ -33,7 +33,6 @@ const initialMessages: ChatMessage[] = [
     id: "welcome",
     role: "assistant",
     content: "Hi. Ask me anything about Klaster.",
-    createdAt: new Date(),
   },
 ];
 
