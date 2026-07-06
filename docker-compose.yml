@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: nextjs-chat-app:latest
+    container_name: nextjs-chat-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    networks:
+      - app-network
+    expose:
+      - "3000"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: nextjs-chat-app:migrate
+    profiles:
+      - tools
+    env_file:
+      - .env
+    networks:
+      - app-network
+    command: npm run db:migrate
+
+networks:
+  app-network:
+    name: ${DOCKER_NETWORK:-app-network}
+    external: true

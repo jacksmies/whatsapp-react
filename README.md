@@ -87,3 +87,47 @@ npm test
 npm run lint
 npm run build
 ```
+
+## Docker Deployment
+
+The app includes a production `Dockerfile` and `docker-compose.yml`.
+
+Set production values in `.env` on the server. If Postgres is another container,
+use its Docker service/container name instead of `localhost`:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@postgres:5432/chatbot
+DOCKER_NETWORK=app-network
+MODEL_NAME=openai/gpt-oss-20b
+MODEL_BASE_URL=https://api.groq.com/openai/v1
+MODEL_API_KEY=gsk-your-key
+```
+
+The compose file joins an external Docker network. It defaults to
+`app-network`, or you can override it with `DOCKER_NETWORK` in `.env`.
+
+Create the network if it does not already exist:
+
+```bash
+docker network create app-network
+```
+
+Build and start the app:
+
+```bash
+docker compose up -d --build
+```
+
+Run database migrations from the app image:
+
+```bash
+docker compose run --rm migrate
+```
+
+Caddy can reverse proxy to the app container on port `3000`, for example:
+
+```caddyfile
+chat.example.com {
+  reverse_proxy nextjs-chat-app:3000
+}
+```
