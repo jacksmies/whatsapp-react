@@ -273,6 +273,102 @@ describe("requestOllamaChat", () => {
       content: "The user greeted us, so answer briefly.",
     });
   });
+
+  it("sends Responses tool outputs without previous_response_id for Groq", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://api.groq.com/openai/v1");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: "response-1",
+            output: [
+              {
+                type: "function_call",
+                name: "list_course_availability",
+                call_id: "call-1",
+                arguments: JSON.stringify({ courseTitle: "public speaking" }),
+              },
+            ],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            output_text: "Public speaking has 8 seats available.",
+          }),
+        ),
+      );
+    const execute = vi.fn().mockResolvedValue([
+      {
+        title: "Public Speaking Course",
+        startDate: "2026-08-15",
+        availability: 8,
+      },
+    ]);
+
+    await expect(
+      requestOllamaChatWithTools({
+        model: "openai/gpt-oss-20b",
+        messages: [{ role: "user", content: "Any public speaking seats?" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "list_course_availability",
+              description: "List available course dates.",
+              parameters: {
+                type: "object",
+                required: ["courseTitle"],
+                properties: {
+                  courseTitle: { type: "string" },
+                },
+              },
+            },
+            execute,
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      role: "assistant",
+      content: "Public speaking has 8 seats available.",
+    });
+
+    expect(execute).toHaveBeenCalledWith({ courseTitle: "public speaking" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1]?.body as string)).toEqual({
+      model: "openai/gpt-oss-20b",
+      input: [
+        { role: "user", content: "Any public speaking seats?" },
+        {
+          type: "function_call",
+          name: "list_course_availability",
+          call_id: "call-1",
+          arguments: JSON.stringify({ courseTitle: "public speaking" }),
+        },
+        {
+          type: "function_call_output",
+          call_id: "call-1",
+          output:
+            '[{"title":"Public Speaking Course","startDate":"2026-08-15","availability":8}]',
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          name: "list_course_availability",
+          description: "List available course dates.",
+          parameters: {
+            type: "object",
+            required: ["courseTitle"],
+            properties: {
+              courseTitle: { type: "string" },
+            },
+          },
+        },
+      ],
+    });
+  });
 });
 
 describe("requestOllamaChatWithTools", () => {

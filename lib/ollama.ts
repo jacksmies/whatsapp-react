@@ -72,6 +72,7 @@ type OpenAIResponsesInput =
       role: ChatRole;
       content: string;
     }
+  | OpenAIResponsesFunctionCall
   | {
       type: "function_call_output";
       call_id: string;
@@ -320,12 +321,10 @@ function buildOpenAIResponsesPayload({
   model,
   input,
   tools,
-  previousResponseId,
 }: {
   model: string;
   input: OpenAIResponsesInput[];
   tools: ToolDefinition[];
-  previousResponseId?: string;
 }) {
   const reasoningEffort = getModelReasoningEffort();
 
@@ -336,7 +335,6 @@ function buildOpenAIResponsesPayload({
     ...(tools.length > 0
       ? { tools: buildOpenAIResponsesToolSchemas(tools) }
       : {}),
-    ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
   };
 }
 
@@ -412,7 +410,6 @@ async function requestOpenAIResponsesWithTools({
   const responsesUrl = resolveOpenAIResponsesUrl(modelBaseUrl);
   const toolMap = new Map(tools.map((tool) => [tool.function.name, tool]));
   const input: OpenAIResponsesInput[] = normalizeInitialMessages(messages);
-  let previousResponseId: string | undefined;
 
   logToolDebug("responses-start", {
     model,
@@ -428,12 +425,10 @@ async function requestOpenAIResponsesWithTools({
         model,
         input,
         tools,
-        previousResponseId,
       }),
     )) as OpenAIResponsesResponse;
     const functionCalls = parseOpenAIResponsesFunctionCalls(data);
 
-    previousResponseId = data.id ?? previousResponseId;
     const reasoning = parseOpenAIResponsesReasoning(data);
 
     if (reasoning) {
@@ -468,6 +463,8 @@ async function requestOpenAIResponsesWithTools({
     }
 
     for (const functionCall of functionCalls) {
+      input.push(functionCall);
+
       const tool = toolMap.get(functionCall.name);
       const args = parseOpenAIResponsesArguments(functionCall.arguments);
       const result = tool
