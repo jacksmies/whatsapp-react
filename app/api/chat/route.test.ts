@@ -100,7 +100,7 @@ describe("POST /api/chat", () => {
       messages: [
         {
           role: "system",
-          content: expect.stringContaining("Academy Knowledge Base"),
+          content: expect.stringContaining("CLARA"),
         },
         { role: "user", content: "Where are you located?" },
         { role: "assistant", content: "Dubai Knowledge Park." },

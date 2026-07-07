@@ -30,6 +30,12 @@ describe("buildSystemPromptWithKnowledge", () => {
     expect(prompt).toContain(
       "When the customer mentions a month or year, include that month or year in the list_course_availability tool arguments.",
     );
+    expect(prompt).toContain(
+      "Do not use list_course_availability for price, fee, curriculum, location, or registration questions unless the customer also asks about dates, seats, or availability.",
+    );
+    expect(prompt).toContain(
+      "For optional tool arguments, omit unknown values. Never send empty strings for month or year.",
+    );
   });
 });
 

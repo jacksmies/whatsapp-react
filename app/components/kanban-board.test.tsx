@@ -13,6 +13,12 @@ function cardTitles() {
     .map((card) => within(card).getByRole("heading", { level: 2 }).textContent);
 }
 
+function cardRanks() {
+  return screen
+    .getAllByTestId("kanban-card")
+    .map((card) => within(card).getByLabelText(/Rank \d/).textContent);
+}
+
 describe("KanbanBoard", () => {
   afterEach(() => {
     cleanup();
@@ -25,12 +31,13 @@ describe("KanbanBoard", () => {
     expect(cardTitles()).toEqual([
       "Creator",
       "Marketer",
-      "Buidler",
+      "Builder",
       "Evaluator",
-      "Emphatiser",
+      "Empathiser",
       "Grinder",
     ]);
-    expect(screen.getAllByText(/Lorem ipsum/i)).toHaveLength(6);
+    expect(cardRanks()).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(screen.getByText(/The Creator asks/i)).toBeInTheDocument();
   });
 
   it("moves a dragged card before the drop target and saves the order", () => {
@@ -45,17 +52,18 @@ describe("KanbanBoard", () => {
       "Grinder",
       "Creator",
       "Marketer",
-      "Buidler",
+      "Builder",
       "Evaluator",
-      "Emphatiser",
+      "Empathiser",
     ]);
+    expect(cardRanks()).toEqual(["1", "2", "3", "4", "5", "6"]);
     expect(JSON.parse(String(localStorage.getItem(storageKey)))).toEqual([
       "grinder",
       "creator",
       "marketer",
-      "buidler",
+      "builder",
       "evaluator",
-      "emphatiser",
+      "empathiser",
     ]);
   });
 
@@ -66,8 +74,8 @@ describe("KanbanBoard", () => {
         "marketer",
         "creator",
         "grinder",
-        "buidler",
-        "emphatiser",
+        "builder",
+        "empathiser",
         "evaluator",
       ]),
     );
@@ -78,8 +86,8 @@ describe("KanbanBoard", () => {
       "Marketer",
       "Creator",
       "Grinder",
-      "Buidler",
-      "Emphatiser",
+      "Builder",
+      "Empathiser",
       "Evaluator",
     ]);
   });

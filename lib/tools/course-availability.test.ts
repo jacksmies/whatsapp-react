@@ -69,6 +69,38 @@ describe("courseAvailabilityTool", () => {
     });
   });
 
+  it("accepts string year values and ignores empty optional filters", async () => {
+    listCourseAvailabilityMock.mockResolvedValue([]);
+
+    await courseAvailabilityTool.execute({
+      courseTitle: "public speaking",
+      month: "",
+      year: "2026",
+    });
+
+    expect(listCourseAvailabilityMock).toHaveBeenCalledWith({
+      courseTitle: "public speaking",
+      year: 2026,
+    });
+
+    await courseAvailabilityTool.execute({
+      courseTitle: "public speaking",
+      year: "",
+    });
+
+    expect(listCourseAvailabilityMock).toHaveBeenLastCalledWith({
+      courseTitle: "public speaking",
+    });
+  });
+
+  it("defines year as a string so empty optional values do not fail provider validation", () => {
+    expect(
+      courseAvailabilityTool.function.parameters.properties.year,
+    ).toMatchObject({
+      type: "string",
+    });
+  });
+
   it("rejects invalid course title arguments", async () => {
     await expect(
       courseAvailabilityTool.execute({ courseTitle: "   " }),

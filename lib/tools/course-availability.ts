@@ -22,9 +22,16 @@ function readOptionalMonth(args: Record<string, unknown>) {
 }
 
 function readOptionalYear(args: Record<string, unknown>) {
-  return typeof args.year === "number" && Number.isInteger(args.year)
-    ? args.year
-    : undefined;
+  if (typeof args.year === "number" && Number.isInteger(args.year)) {
+    return args.year;
+  }
+
+  if (typeof args.year === "string" && args.year.trim()) {
+    const parsedYear = Number.parseInt(args.year.trim(), 10);
+    return Number.isInteger(parsedYear) ? parsedYear : undefined;
+  }
+
+  return undefined;
 }
 
 export const courseAvailabilityTool: ToolDefinition = {
@@ -48,9 +55,9 @@ export const courseAvailabilityTool: ToolDefinition = {
             "Optional requested month name, for example august, when the customer asks for availability in a specific month.",
         },
         year: {
-          type: "integer",
+          type: "string",
           description:
-            "Optional requested year, for example 2026, when the customer asks for a specific year.",
+            "Optional requested four-digit year, for example 2026, when the customer asks for a specific year. Omit this field when no year is requested; do not send an empty string.",
         },
       },
     },
