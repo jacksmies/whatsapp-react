@@ -67,7 +67,8 @@ export async function POST(request: Request) {
         knowledge: KNOWLEDGE_BASE,
         messages: body.messages,
       }),
-      tools: academyTools,
+      tools: [],
+      //tools: academyTools,
     });
 
     await saveMessage({
